@@ -222,10 +222,27 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## 5. Automated Test Suite
 
-### Full Automated Verification
-The repository contains a full regression suite validating the health check, negative input validation paths, battery bound errors, and all 10 cases in the official public reference pack:
+### Live & End-to-End Verification (Zero Dependencies)
+A standalone test runner verifies the live deployed endpoint (or any local instance) without requiring third-party libraries:
 ```bash
-python tests/test_local.py
+# Run against the live deployed endpoint
+python3 tests/test_live.py https://161-248-188-105.nip.io
+
+# Or run against a local instance
+python3 tests/test_live.py http://localhost:8000
+```
+**Test Coverage:**
+* Health readiness check (`GET /health`)
+* All 10 manual edge-case payloads in `tests/manual/` (all 6 directive types, out-of-scope notes, 400 bad JSON, 422 battery bound violation)
+* Section 11.4 paraphrased notes and colloquial daylight phrasings
+* All 10 official public sample cases from `BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json` (0.00 BDT cost diff, 0.0000 balance conservation, zero null keys, battery neutrality)
+
+**Expected Result:** `22/22 tests passed (100.0%)`
+
+### In-Memory Local Regression Suite
+Validates the FastAPI application in-memory with TestClient across schema validation, battery boundaries, classification pack, and reference pack:
+```bash
+python3 tests/test_local.py
 ```
 **Expected Result:**
 ```
@@ -236,9 +253,22 @@ all tests passed
 ### Classification Benchmark
 Evaluates the prompt against 18 synthetic operator note edge cases across all directive types and distractor combinations:
 ```bash
-python tests/classify_scorer.py
+python3 tests/classify_scorer.py
 ```
-**Expected Result:** `18/18 correct (100.0%)`
+**Expected Result:** `18/18 correct on classification pack (100.0%)`
+
+### Manual Test Payloads
+The `tests/manual/` directory contains 10 standalone JSON payloads covering specific rubric edge cases:
+* `01_no_op.json`: Out-of-scope administrative note (`no_op`)
+* `02_solar_reduction.json`: Fractional solar reduction window
+* `03_no_discharge_window.json`: Battery no-discharge window ("discharge" substring safety)
+* `04_no_charge_window.json`: Battery no-charge window
+* `05_minimum_battery_reserve.json`: Percentage-to-kWh battery reserve
+* `06_max_grid_window.json`: Peak grid import power limit
+* `07_multiple_directives.json`: Simultaneous compound directives
+* `08_out_of_scope_note.json`: Future hardware mention (EV charger)
+* `09_invalid_battery_bounds.json`: Semantic bound violation (triggers HTTP 422)
+* `10_invalid_structure.json`: Malformed JSON schema (triggers HTTP 400)
 
 ---
 
