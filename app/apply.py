@@ -53,15 +53,15 @@ def build_params(
             continue
 
         adjustment = entry.structured_adjustment
-        hours = adjustment.get("hours", [])
+        hours = adjustment.hours
 
         if entry.directive_type == "solar_reduction":
-            factor = adjustment["factor"]
+            factor = adjustment.factor
             for h in hours:
                 effective_solar_kwh[h] *= factor
 
         elif entry.directive_type == "minimum_battery_reserve":
-            value = adjustment["minimum_energy_kwh"]
+            value = adjustment.minimum_energy_kwh
             for h in hours:
                 min_energy_kwh[h] = max(min_energy_kwh[h], value)
 
@@ -72,7 +72,7 @@ def build_params(
             no_discharge_hours.update(hours)
 
         elif entry.directive_type == "max_grid_window":
-            value = adjustment["max_grid_kwh"]
+            value = adjustment.max_grid_kwh
             for h in hours:
                 if h in max_grid_kwh:
                     max_grid_kwh[h] = min(max_grid_kwh[h], value)
