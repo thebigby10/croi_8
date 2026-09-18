@@ -79,18 +79,3 @@ class ScenarioResponse(BaseModel):
     plan_summary: str
 
 
-# --- current /optimize-energy request/response, pending replacement by ScenarioRequest/ScenarioResponse ---
-
-class OptimizeRequest(BaseModel):
-    instructions: str = ""
-
-
-class HourlyRow(BaseModel):
-    hour: int
-    grid_kw: float
-
-
-class OptimizeResponse(BaseModel):
-    rows: List[HourlyRow]
-    directives: List[str]
-    warnings: List[str] = Field(default_factory=list)
