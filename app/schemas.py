@@ -1,6 +1,13 @@
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 _EXAMPLE_SCENARIO_REQUEST = {
     "scenario_id": "example-scenario-1",
@@ -126,6 +133,17 @@ class StructuredAdjustment(BaseModel):
         if hours != sorted(hours):
             raise ValueError("hours must be in ascending order")
         return hours
+
+    @model_serializer
+    def serialize_model(self) -> Dict[str, Any]:
+        data: Dict[str, Any] = {"hours": self.hours}
+        if self.factor is not None:
+            data["factor"] = self.factor
+        if self.minimum_energy_kwh is not None:
+            data["minimum_energy_kwh"] = self.minimum_energy_kwh
+        if self.max_grid_kwh is not None:
+            data["max_grid_kwh"] = self.max_grid_kwh
+        return data
 
 
 class DirectiveInterpretation(BaseModel):

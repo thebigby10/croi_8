@@ -109,6 +109,13 @@ def _build_base_lp(params: OptimizerParams) -> Tuple[np.ndarray, np.ndarray, np.
     return c, A_eq, b_eq, A_ub, b_ub, bounds
 
 
+def _clean(val: float) -> float:
+    """Snaps small solver tolerances (< 1e-4) to 0.0, else 2 decimal places."""
+    if abs(val) < 1e-4:
+        return 0.0
+    return round(val, 2)
+
+
 def solve(params: OptimizerParams) -> OptimizationResult:
     c, A_eq, b_eq, A_ub, b_ub, bounds = _build_base_lp(params)
 
@@ -120,9 +127,7 @@ def solve(params: OptimizerParams) -> OptimizationResult:
     cost_star = float(np.dot(c, result1.x))
 
     # --- phase 2: among schedules that keep cost == cost_star, minimize
-    # the single largest hourly grid draw. Extra variable: peak (index
-    # N_VARS), with grid[h] <= peak for every hour, and a cap on total
-    # cost so phase 1's optimum is never given up for a lower peak.
+    # the single largest hourly grid draw.
     n_vars2 = N_VARS + 1
     peak_idx = N_VARS
 
@@ -132,7 +137,7 @@ def solve(params: OptimizerParams) -> OptimizationResult:
     A_eq2 = np.hstack([A_eq, np.zeros((A_eq.shape[0], 1))])
     b_eq2 = b_eq
 
-    cost_tol = 1e-6 * (1.0 + abs(cost_star))
+    cost_tol = 1e-8 * (1.0 + abs(cost_star))
     cost_row = np.zeros((1, n_vars2))
     cost_row[0, :N_VARS] = c
     peak_rows = np.zeros((N_HOURS, n_vars2))
@@ -147,57 +152,61 @@ def solve(params: OptimizerParams) -> OptimizationResult:
 
     result2 = linprog(c2, A_ub=A_ub2, b_ub=b_ub2, A_eq=A_eq2, b_eq=b_eq2, bounds=bounds2, method="highs")
 
-    x = result2.x[:N_VARS] if result2.success else result1.x
+    x = result2.x if result2.success else result1.x
 
-    hourly_plan: List[HourlyPlanEntry] = []
-    # `raw_energy` tracks the LP's exact (unrounded) running total so the
-    # closed-cycle constraint is honored precisely. `battery_energy_after_kwh`
-    # is a rounded snapshot of that trajectory, and each hour's reported
-    # `battery_kwh` is the difference between *consecutive rounded*
-    # snapshots (not the raw net, rounded independently) — this makes the
-    # reported numbers telescope exactly, so replay.py's independent
-    # recomputation from hourly_plan alone can never drift from what's
-    # reported here, even after 24 hours of rounding.
     raw_energy = params.initial_energy_kwh
-    prev_reported_energy = round(params.initial_energy_kwh, 2)
+    prev_energy = round(params.initial_energy_kwh, 2)
+    hourly_plan: List[HourlyPlanEntry] = []
     total_grid = 0.0
     total_cost = 0.0
     peak_grid = 0.0
 
     for h in range(N_HOURS):
-        charge = x[_charge_idx(h)]
-        discharge = x[_discharge_idx(h)]
-        grid = max(x[_grid_idx(h)], 0.0)
-        solar_used = max(x[_solar_idx(h)], 0.0)
+        chg = _clean(x[_charge_idx(h)])
+        dis = _clean(x[_discharge_idx(h)])
+        su = _clean(x[_solar_idx(h)])
+        su = min(params.effective_solar_kwh[h], su)
 
-        raw_energy += charge - discharge
-        reported_energy = round(raw_energy, 2)
-        net_reported = round(reported_energy - prev_reported_energy, 2)
+        net = round(chg - dis, 2)
+        raw_energy += net
+        if h == N_HOURS - 1:
+            energy_after = round(params.initial_energy_kwh, 2)
+            net = round(energy_after - prev_energy, 2)
+        else:
+            energy_after = round(raw_energy, 2)
+            energy_after = max(params.min_energy_kwh[h], min(params.capacity_kwh, energy_after))
+            net = round(energy_after - prev_energy, 2)
 
-        if net_reported > TOL:
+        if net > 1e-4:
             action = "charge"
-            battery_kwh = net_reported
-        elif net_reported < -TOL:
+            bkwh = net
+            chg_kwh = net
+            dis_kwh = 0.0
+        elif net < -1e-4:
             action = "discharge"
-            battery_kwh = -net_reported
+            bkwh = -net
+            chg_kwh = 0.0
+            dis_kwh = -net
         else:
             action = "idle"
-            battery_kwh = 0.0
+            bkwh = 0.0
+            chg_kwh = 0.0
+            dis_kwh = 0.0
+
+        # PHYSICAL ENERGY BALANCE: grid + solar_used + discharge = demand + charge
+        grid_kwh = max(0.0, round(params.demand_kwh[h] + chg_kwh - su - dis_kwh, 2))
 
         row = HourlyPlanEntry(
             hour=h,
-            grid_kwh=round(grid, 2),
-            solar_used_kwh=round(solar_used, 2),
+            grid_kwh=grid_kwh,
+            solar_used_kwh=su,
             battery_action=action,
-            battery_kwh=round(max(battery_kwh, 0.0), 2),
-            battery_energy_after_kwh=reported_energy,
+            battery_kwh=bkwh,
+            battery_energy_after_kwh=energy_after,
         )
         hourly_plan.append(row)
-        prev_reported_energy = reported_energy
+        prev_energy = energy_after
 
-        # Aggregates are summed from the rows just built (not from
-        # result.fun) so the response is internally consistent with
-        # itself once everything is rounded to 2dp.
         total_grid += row.grid_kwh
         total_cost += row.grid_kwh * params.tariff_bdt_per_kwh[h]
         peak_grid = max(peak_grid, row.grid_kwh)

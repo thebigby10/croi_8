@@ -72,6 +72,16 @@ def verify(response: ScenarioResponse, params: OptimizerParams) -> List[str]:
                 f"effective_solar_kwh {params.effective_solar_kwh[h]}"
             )
 
+        # Physical energy balance: grid + solar_used + discharge == demand + charge
+        discharge_kwh = row.battery_kwh if row.battery_action == "discharge" else 0.0
+        charge_kwh = row.battery_kwh if row.battery_action == "charge" else 0.0
+        supply = row.grid_kwh + row.solar_used_kwh + discharge_kwh
+        sink = params.demand_kwh[h] + charge_kwh
+        if abs(supply - sink) > TOL:
+            warnings.append(
+                f"hour {h}: energy balance violation: supply {supply:.2f} != demand+charge {sink:.2f}"
+            )
+
         total_grid += row.grid_kwh
         total_cost += row.grid_kwh * params.tariff_bdt_per_kwh[h]
         peak_grid = max(peak_grid, row.grid_kwh)
