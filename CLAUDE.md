@@ -19,34 +19,70 @@ no single-test filter beyond editing the file or `pytest tests/test_local.py::te
 ## Architecture
 
 FastAPI app with two endpoints (`app/main.py`): `GET /health` and
-`POST /optimize-energy`. The optimize endpoint is a fixed five-stage pipeline,
-one module per stage, wired together in `main.optimize_energy`:
+`POST /optimize-energy`. The optimize endpoint is a real fixed six-stage
+pipeline, one module per stage, wired together in `main.optimize_energy`:
 
 ```
-instructions -> llm.get_directives -> (on any exception) fallback.extract_directives
-             -> guardrails.validate_and_normalize -> apply.build_params
-             -> optimizer.solve -> replay.verify -> OptimizeResponse
+ScenarioRequest -> llm.get_directives -> (on any exception) fallback.extract_directives
+                -> guardrails.validate_and_normalize -> apply.build_params
+                -> optimizer.solve -> replay.verify -> ScenarioResponse
 ```
 
-- `llm.py`: single LLM call via the `google-genai` SDK (`gemini-3.5-flash-lite`).
-  Raises `RuntimeError` immediately (without calling the API) if `instructions`
-  is blank or `GEMINI_API_KEY` is unset. The `google.genai` import is lazy,
-  inside the function.
-- `fallback.py`: regex/rule-based backup path. `main.py` catches *any*
-  exception from `llm.get_directives` and falls back here — this is the
-  intended, expected control flow, not an error case.
-- `guardrails.py`: validates/normalizes whatever directive list came out of
-  either path above before it's trusted downstream.
-- `apply.py`: maps normalized directives to `optimizer` parameters.
-- `optimizer.py`: currently a placeholder — returns 24 flat hourly rows
-  (`grid_kw=1.0`), not a real solve. Real optimization logic (e.g. an LP
-  solve) belongs here.
-- `replay.py`: re-checks the plan `optimizer.py` produced before it's
-  returned to the caller (currently just row-count).
+`app/schemas.py` defines the request/response contract: `ScenarioRequest`
+(`scenario_id`, 1-3 `operator_notes`, exactly 24 `hours`, `battery`) and
+`ScenarioResponse` (`directive_interpretation`, `hourly_plan`,
+`total_grid_kwh`, `total_cost_bdt`, `peak_grid_kwh`, `plan_summary`).
+`main.py` also enforces the one semantic check that can't be a single-field
+constraint: `battery.minimum_energy_kwh <= battery.initial_energy_kwh <=
+battery.capacity_kwh` (violations -> HTTP 422). Structural validation
+failures (`RequestValidationError`) are mapped to HTTP 400.
 
-Each stage is a separate module by design so the placeholder logic in
-`optimizer.py`/`fallback.py`/`guardrails.py` can be swapped for real
-implementations independently.
+- `llm.py`: single LLM call via the `google-genai` SDK (`gemini-3.5-flash-lite`),
+  given `operator_notes` and `battery.capacity_kwh`. Returns one raw
+  directive-interpretation dict per note, in order. Raises `RuntimeError` on
+  a blank/empty note list, missing `GEMINI_API_KEY`, or a response whose
+  length doesn't match `len(operator_notes)` — any of these are the
+  intended trigger for falling through to `fallback.py`. The `google.genai`
+  import is lazy, inside the function.
+- `fallback.py`: regex/rule-based backup classifier (`classify_note`,
+  `extract_directives`). Runs a strict decision order (no_discharge_window
+  first, to dodge the "discharge" contains "charge" substring trap) and
+  only commits to a label when it also finds the structure that label
+  needs (a parseable hour window, a magnitude, etc); otherwise falls
+  through toward `no_op`. `main.py` catches *any* exception from
+  `llm.get_directives` and falls back here — this is the intended,
+  expected control flow, not an error case.
+- `guardrails.py`: two independent validation layers — classification
+  invariants (`applies` is always derived from `directive_type`, never
+  read off the raw entry; exactly one entry per note, missing/malformed
+  entries coerce to `no_op`) and parameter-shape validation (a bad
+  `structured_adjustment` does not demote a correct label to `no_op`; it
+  just leaves nothing for `apply.py` to fold in).
+- `apply.py`: `build_params(directive_interpretation, request) ->
+  OptimizerParams` — folds each `applies=True` directive's
+  `structured_adjustment` into per-hour LP parameters (effective solar,
+  battery floor, no-charge/no-discharge hour sets, per-hour grid caps).
+- `optimizer.py`: a real LP (`scipy.optimize.linprog`, `method="highs"`)
+  over 96 variables (charge/discharge/grid/solar_used x 24 hours).
+  Minimizes grid cost subject to per-hour energy balance, a closed
+  battery cycle (`E[23] == initial_energy_kwh`), and per-hour
+  capacity/floor bounds. Raises `RuntimeError` if infeasible (mapped to
+  HTTP 500 by `main.py`). Aggregates (`total_grid_kwh`, `total_cost_bdt`,
+  `peak_grid_kwh`) are summed from the rounded hourly rows, not from
+  `result.fun`, so the response is internally self-consistent.
+- `replay.py`: independently re-derives everything from `hourly_plan`
+  alone (energy balance, floor/capacity bounds, window enforcement, grid
+  caps, solar-used bounds, return-to-initial-state, and the three
+  top-level aggregates) and compares against `OptimizerParams` and the
+  response's own fields. Any mismatch becomes a warning; `main.py` turns
+  non-empty warnings into HTTP 500 rather than returning a plan that
+  fails its own internal check.
+
+`tests/classification_pack.json` + `tests/classify_scorer.py` are a
+self-authored regression pack for `fallback.classify_note` (the verbatim
+hidden 18-note pack referenced in `plan.md` was never available in this
+repo). `tests/test_local.py::test_classification_pack` runs it as part of
+the normal suite.
 
 `docker-compose.yml` maps the app to host port **9000** (container still
 listens on 8000) and runs a `mongo:7` service with a `mongo_data` volume. The
