@@ -165,7 +165,7 @@ def solve(params: OptimizerParams) -> OptimizationResult:
         chg = _clean(x[_charge_idx(h)])
         dis = _clean(x[_discharge_idx(h)])
         su = _clean(x[_solar_idx(h)])
-        su = min(params.effective_solar_kwh[h], su)
+        su = round(min(params.effective_solar_kwh[h], su), 2)
 
         net = round(chg - dis, 2)
         raw_energy += net
