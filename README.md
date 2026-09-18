@@ -43,9 +43,7 @@ curl -s -X POST https://161-248-188-105.nip.io/optimize-energy \
       "directive_type": "solar_reduction",
       "structured_adjustment": {
         "hours": [12, 13],
-        "factor": 0.25,
-        "minimum_energy_kwh": null,
-        "max_grid_kwh": null
+        "factor": 0.25
       },
       "explanation": "Solar panels are being washed from noon to 2 PM, reducing usable solar to 25% of the forecast during hours 12 and 13."
     },
@@ -85,13 +83,13 @@ curl -s -X POST https://161-248-188-105.nip.io/optimize-energy \
     }
   ],
   "total_grid_kwh": 2692.5,
-  "total_cost_bdt": 38365.04,
-  "peak_grid_kwh": 174.99,
+  "total_cost_bdt": 38365.0,
+  "peak_grid_kwh": 175.0,
   "plan_summary": "1 directive(s) applied (solar_reduction); 1 note(s) treated as no_op."
 }
 ```
 
-* **Cost Optimality:** Expected reference cost is `38,365.00 BDT`; calculated cost is `38,365.04 BDT` (exact mathematical match within the 0.01 tolerance).
+* **Cost Optimality:** Expected reference cost is `38,365.00 BDT`; calculated cost is `38,365.00 BDT` (exact mathematical match, 0.00 difference).
 * **Battery Neutrality:** Battery starts at `110.0 kWh` and ends at `110.0 kWh` at the conclusion of hour 23.
 * **Interpretation Accuracy:** Note 0 correctly identifies the 25% solar factor across hours `[12, 13]`; Note 1 correctly identifies the distractor note as `no_op`.
 
