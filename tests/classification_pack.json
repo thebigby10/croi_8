@@ -1,0 +1,92 @@
+[
+  {
+    "note": "Do not discharge the battery between 1pm and 3pm for relay protection testing.",
+    "expected_directive_type": "no_discharge_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Suspend battery discharge from 9am to 10am while we run substation testing.",
+    "expected_directive_type": "no_discharge_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Please avoid discharging the battery from 6pm to 7pm while we test the emergency relay.",
+    "expected_directive_type": "no_discharge_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Disconnect the charger circuit from 2am to 4am for scheduled maintenance.",
+    "expected_directive_type": "no_charge_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Keep the charging circuit offline between midnight and 1am.",
+    "expected_directive_type": "no_charge_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Reduce solar array output by 80% from 10am to 2pm due to cloud cover.",
+    "expected_directive_type": "solar_reduction",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "The rooftop PV inverter will only deliver 30% of normal output between 7am and 9am.",
+    "expected_directive_type": "solar_reduction",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Photovoltaic panels are expected to drop output by half from 3pm to 5pm due to partial shading.",
+    "expected_directive_type": "solar_reduction",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Grid import at the substation must not exceed 5 kWh between 5pm and 8pm.",
+    "expected_directive_type": "max_grid_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Limit feeder intake to 3 kWh from 6am to 7am during transformer testing.",
+    "expected_directive_type": "max_grid_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "The transformer feeder must stay at or below 4 kWh from 5pm to 6pm.",
+    "expected_directive_type": "max_grid_window",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Keep at least 5 kWh stored in the battery between 5pm and 7pm to cover an outage risk.",
+    "expected_directive_type": "minimum_battery_reserve",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "The battery must remain at 20% of capacity or higher from 9pm to 11pm.",
+    "expected_directive_type": "minimum_battery_reserve",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Reserve a minimum of 2 kWh in the battery from 4am to 5am for backup power.",
+    "expected_directive_type": "minimum_battery_reserve",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "Please remember to submit the monthly maintenance report by Friday.",
+    "expected_directive_type": "no_op",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "The site access badge system will be down for IT upgrades this week.",
+    "expected_directive_type": "no_op",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "We are shifting the afternoon shift's heavy equipment usage to reduce demand between 1pm and 3pm.",
+    "expected_directive_type": "no_op",
+    "capacity_kwh": 10.0
+  },
+  {
+    "note": "The backup diesel generator will be tested for 30 minutes tomorrow morning.",
+    "expected_directive_type": "no_op",
+    "capacity_kwh": 10.0
+  }
+]
