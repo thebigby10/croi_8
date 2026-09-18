@@ -1,0 +1,10 @@
+[
+  {
+    "name": "basic_instructions",
+    "request": { "instructions": "avoid grid between 5pm and 8pm, prioritize cost" }
+  },
+  {
+    "name": "no_instructions",
+    "request": { "instructions": "" }
+  }
+]
