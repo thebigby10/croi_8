@@ -5,7 +5,7 @@ services:
       - "9000:8000"
     environment:
       - MONGO_URL=mongodb://mongo:27017
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - mongo
 

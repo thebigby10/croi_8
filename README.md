@@ -9,7 +9,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Set `ANTHROPIC_API_KEY` to enable LLM directive extraction; without it (or on
+Set `GEMINI_API_KEY` to enable LLM directive extraction; without it (or on
 any LLM failure) requests fall back to `app/fallback.py` automatically.
 
 ## Endpoints
